@@ -149,13 +149,11 @@ const thrower = (text) => {
       this.queueUpdate("hass");
     }
 
-    fetchTemplate(url) {
-      return fetch(`${url}?t=${new Date().getTime()}`)
-        .then((response) => response.text())
-        .then((text) => {
-          remoteTemplates = evaluateYaml(text);
-          this._templates = { ...remoteTemplates, ...this._inlineTemplates };
-        });
+    async fetchTemplate(url) {
+      const response = await fetch(`${url}?t=${new Date().getTime()}`);
+      const text = await response.text();
+      remoteTemplates = await evaluateYaml(text, url.substring(0, url.lastIndexOf("/") + 1));
+      this._templates = { ...remoteTemplates, ...this._inlineTemplates };
     }
 
     getTemplates() {
@@ -311,4 +309,4 @@ const thrower = (text) => {
   );
 })();
 
-export {};
+export { };
