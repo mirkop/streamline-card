@@ -1,4 +1,4 @@
-import { parseDocument, YAMLMap } from "yaml";
+import { parseDocument, YAMLMap, Scalar } from "yaml";
 
 // Helper to fetch and parse a YAML file
 async function fetchAndParseYaml(url) {
@@ -10,8 +10,6 @@ async function fetchAndParseYaml(url) {
 
 // Helper to fetch all YAML files in a directory (assumes a manifest file listing them)
 async function fetchDirNamed(baseUrl) {
-  // For browser, we need a manifest file listing YAML files in the directory
-  // e.g., baseUrl + "manifest.json" with ["file1.yaml", "file2.yaml"]
   const manifestUrl = baseUrl + "manifest.json";
   const response = await fetch(manifestUrl);
   if (!response.ok) throw new Error(`Failed to fetch manifest: ${manifestUrl}`);
@@ -24,37 +22,39 @@ async function fetchDirNamed(baseUrl) {
   return result;
 }
 
+// Custom tag implementations
+const IncludeTag = {
+  tag: "!include",
+  resolve: (doc, cst) => Scalar.resolve(doc, cst),
+  options: {},
+  async: true,
+  construct: async function (data, doc, tag) {
+    const url = doc.options.baseUrl + data;
+    return await fetchAndParseYaml(url);
+  },
+};
+
+const IncludeDirNamedTag = {
+  tag: "!include_dir_named",
+  resolve: (doc, cst) => Scalar.resolve(doc, cst),
+  options: {},
+  async: true,
+  construct: async function (data, doc, tag) {
+    const url = doc.options.baseUrl + data + "/";
+    return await fetchDirNamed(url);
+  },
+};
+
 // Main async YAML evaluator with custom tags
 export default async function evaluateYaml(yamlString, baseUrl = "/hacsfiles/streamline-card/") {
-  const customTags = [
-    {
-      tag: "!include",
-      resolve: (str) => str,
-      async: true,
-      construct: async (data) => {
-        // Support relative includes
-        const url = baseUrl + data;
-        return await fetchAndParseYaml(url);
-      },
-    },
-    {
-      tag: "!include_dir_named",
-      resolve: (str) => str,
-      async: true,
-      construct: async (data) => {
-        // Support relative directory includes
-        const url = baseUrl + data + "/";
-        return await fetchDirNamed(url);
-      },
-    },
-  ];
+  const customTags = [IncludeTag, IncludeDirNamedTag];
 
-  // Parse the document with custom tags
-  const doc = parseDocument(yamlString, { customTags });
+  // Attach baseUrl to options so custom tags can access it
+  const doc = parseDocument(yamlString, { customTags, baseUrl });
 
   // Recursively resolve async tags
   async function resolveAsync(node) {
-    if (node && typeof node === "object" && node.tag && node.tag.startsWith("!include")) {
+    if (node && typeof node === "object" && node.tag && (node.tag === "!include" || node.tag === "!include_dir_named")) {
       return await node.resolve();
     }
     if (node instanceof YAMLMap) {
@@ -70,5 +70,5 @@ export default async function evaluateYaml(yamlString, baseUrl = "/hacsfiles/str
     return node;
   }
 
-  return await resolveAsync(doc.toJS({ mapAsMap: false }));
+  return await resolveAsync(doc.contents);
 }
