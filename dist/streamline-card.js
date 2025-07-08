@@ -6449,7 +6449,10 @@ async function evaluateYaml(yamlString, baseUrl = "/hacsfiles/streamline-card/")
     }
     if (node instanceof YAMLMap) {
       const out = {};
-      const items = await Promise.all(node.items.map(async ([key, value]) => [key, await resolveAsync2(value, docInstance)]));
+      const items = await Promise.all(node.items.map(async (pair) => [
+        isScalar(pair.key) ? pair.key.value : pair.key,
+        await resolveAsync2(pair.value, docInstance)
+      ]));
       for (const [key, resolvedValue] of items) {
         out[key] = resolvedValue;
       }
