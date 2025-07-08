@@ -170,8 +170,8 @@ const thrower = (text) => {
       if (isTemplateLoaded === null) {
         const filename = "streamline-card/streamline_templates.yaml";
         isTemplateLoaded = this.fetchTemplate(`/hacsfiles/${filename}`)
-          .catch(() => this.fetchTemplate(`/local/${filename}`))
-          .catch(() => this.fetchTemplate(`/local/community/${filename}`));
+          .catch(() => this.fetchTemplate(`/local/community/${filename}`)
+          .catch(() => this.fetchTemplate(`/local/${filename}`)));
       }
       if (isTemplateLoaded instanceof Promise) {
         isTemplateLoaded.then(() => {
