@@ -6421,10 +6421,13 @@ function parseDocument(source, options = {}) {
 }
 const fetchAndParseYaml = async function fetchAndParseYaml2(url) {
   const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch ${url}`);
+  if (!response.ok && response.status !== 0) {
+    throw new Error(`Failed to fetch ${url}: ${response.status} ${response.statusText}`);
   }
   const text = await response.text();
+  if (!text.trim()) {
+    return {};
+  }
   return await evaluateYaml(text, url.substring(0, url.lastIndexOf("/") + 1));
 };
 const IncludeTag = {

@@ -3,8 +3,13 @@ import { Scalar, YAMLMap, YAMLSeq, isScalar, parseDocument } from "yaml";
 // Helper to fetch and parse a YAML file
 const fetchAndParseYaml = async function fetchAndParseYaml(url) {
   const response = await fetch(url);
-  if (!response.ok) { throw new Error(`Failed to fetch ${url}`); }
+  // Only throw if the response is not ok and not 0-length (to allow empty files)
+  if (!response.ok && response.status !== 0) {
+    throw new Error(`Failed to fetch ${url}: ${response.status} ${response.statusText}`);
+  }
   const text = await response.text();
+  // If the file is empty, return an empty object
+  if (!text.trim()) { return {} };
   // eslint-disable-next-line no-use-before-define
   return await evaluateYaml(text, url.substring(0, url.lastIndexOf("/") + 1));
 };
