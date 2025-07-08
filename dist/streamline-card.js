@@ -6608,7 +6608,7 @@ const thrower = (text) => {
       this._templates = { ...remoteTemplates, ...this._inlineTemplates };
       if (isTemplateLoaded === null) {
         const filename = "streamline-card/streamline_templates.yaml";
-        isTemplateLoaded = this.fetchTemplate(`/local/community/${filename}`).catch(() => this.fetchTemplate(`/local/${filename}`));
+        isTemplateLoaded = this.fetchTemplate(`/local/community/${filename}`);
       }
       if (isTemplateLoaded instanceof Promise) {
         isTemplateLoaded.then(() => {
