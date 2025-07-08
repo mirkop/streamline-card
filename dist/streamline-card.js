@@ -6419,22 +6419,64 @@ function parseDocument(source, options = {}) {
   }
   return doc;
 }
-function parse(src, reviver, options) {
-  let _reviver = void 0;
-  const doc = parseDocument(src, options);
-  if (!doc)
-    return null;
-  doc.warnings.forEach((warning) => warn(doc.options.logLevel, warning));
-  if (doc.errors.length > 0) {
-    if (doc.options.logLevel !== "silent")
-      throw doc.errors[0];
-    else
-      doc.errors = [];
-  }
-  return doc.toJS(Object.assign({ reviver: _reviver }, options));
+async function fetchAndParseYaml(url) {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Failed to fetch ${url}`);
+  const text = await response.text();
+  return await evaluateYaml(text, url.substring(0, url.lastIndexOf("/") + 1));
 }
-function evaluateYaml(yamlString) {
-  return parse(yamlString);
+async function fetchDirNamed(baseUrl) {
+  const manifestUrl = baseUrl + "manifest.json";
+  const response = await fetch(manifestUrl);
+  if (!response.ok) throw new Error(`Failed to fetch manifest: ${manifestUrl}`);
+  const files = await response.json();
+  const result = {};
+  for (const file of files) {
+    const name = file.replace(/\..*$/, "");
+    result[name] = await fetchAndParseYaml(baseUrl + file);
+  }
+  return result;
+}
+const IncludeTag = {
+  tag: "!include",
+  resolve: (doc, cst) => Scalar.resolve(doc, cst),
+  options: {},
+  async: true,
+  construct: async function(data, doc, tag) {
+    const url = doc.options.baseUrl + data;
+    return await fetchAndParseYaml(url);
+  }
+};
+const IncludeDirNamedTag = {
+  tag: "!include_dir_named",
+  resolve: (doc, cst) => Scalar.resolve(doc, cst),
+  options: {},
+  async: true,
+  construct: async function(data, doc, tag) {
+    const url = doc.options.baseUrl + data + "/";
+    return await fetchDirNamed(url);
+  }
+};
+async function evaluateYaml(yamlString, baseUrl = "/hacsfiles/streamline-card/") {
+  const customTags = [IncludeTag, IncludeDirNamedTag];
+  const doc = parseDocument(yamlString, { customTags, baseUrl });
+  async function resolveAsync(node) {
+    if (node && typeof node === "object" && node.tag && (node.tag === "!include" || node.tag === "!include_dir_named")) {
+      return await node.resolve();
+    }
+    if (node instanceof YAMLMap) {
+      const out = {};
+      for (const [k, v] of node.items) {
+        out[k] = await resolveAsync(v);
+      }
+      return out;
+    }
+    if (Array.isArray(node)) {
+      return Promise.all(node.map(resolveAsync));
+    }
+    return node;
+  }
+  return await resolveAsync(doc.contents);
 }
 const version = "0.1.0";
 let isTemplateLoaded = null;
@@ -6550,11 +6592,11 @@ const thrower = (text) => {
       }
       this.queueUpdate("hass");
     }
-    fetchTemplate(url) {
-      return fetch(`${url}?t=${(/* @__PURE__ */ new Date()).getTime()}`).then((response) => response.text()).then((text) => {
-        remoteTemplates = evaluateYaml(text);
-        this._templates = { ...remoteTemplates, ...this._inlineTemplates };
-      });
+    async fetchTemplate(url) {
+      const response = await fetch(`${url}?t=${(/* @__PURE__ */ new Date()).getTime()}`);
+      const text = await response.text();
+      remoteTemplates = await evaluateYaml(text, url.substring(0, url.lastIndexOf("/") + 1));
+      this._templates = { ...remoteTemplates, ...this._inlineTemplates };
     }
     getTemplates() {
       const lovelace = getLovelace() || getLovelaceCast();
