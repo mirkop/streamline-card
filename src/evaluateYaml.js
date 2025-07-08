@@ -1,4 +1,4 @@
-import { Scalar, YAMLMap, YAMLSeq, parseDocument } from "yaml";
+import { Scalar, YAMLMap, YAMLSeq, isScalar, parseDocument } from "yaml";
 
 // Helper to fetch and parse a YAML file
 const fetchAndParseYaml = async function fetchAndParseYaml(url) {
@@ -45,7 +45,7 @@ export default async function evaluateYaml(yamlString, baseUrl = "/hacsfiles/str
     if (node instanceof YAMLSeq) {
       return Promise.all(node.items.map(item => resolveAsync(item, docInstance)));
     }
-    if (Scalar.isScalar(node)) {
+    if (isScalar(node)) {
       return node.value;
     }
     // For plain JS objects/arrays (shouldn't happen, but for safety)

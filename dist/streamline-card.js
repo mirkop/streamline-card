@@ -6458,7 +6458,7 @@ async function evaluateYaml(yamlString, baseUrl = "/hacsfiles/streamline-card/")
     if (node instanceof YAMLSeq) {
       return Promise.all(node.items.map((item) => resolveAsync2(item, docInstance)));
     }
-    if (Scalar.isScalar(node)) {
+    if (isScalar(node)) {
       return node.value;
     }
     if (Array.isArray(node)) {
@@ -6608,7 +6608,7 @@ const thrower = (text) => {
       this._templates = { ...remoteTemplates, ...this._inlineTemplates };
       if (isTemplateLoaded === null) {
         const filename = "streamline-card/streamline_templates.yaml";
-        isTemplateLoaded = this.fetchTemplate(`/hacsfiles/${filename}`).catch(() => this.fetchTemplate(`/local/community/${filename}`).catch(() => this.fetchTemplate(`/local/${filename}`)));
+        isTemplateLoaded = this.fetchTemplate(`/local/community/${filename}`).catch(() => this.fetchTemplate(`/local/${filename}`));
       }
       if (isTemplateLoaded instanceof Promise) {
         isTemplateLoaded.then(() => {

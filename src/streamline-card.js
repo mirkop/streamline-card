@@ -169,9 +169,11 @@ const thrower = (text) => {
 
       if (isTemplateLoaded === null) {
         const filename = "streamline-card/streamline_templates.yaml";
-        isTemplateLoaded = this.fetchTemplate(`/hacsfiles/${filename}`)
-          .catch(() => this.fetchTemplate(`/local/community/${filename}`)
-          .catch(() => this.fetchTemplate(`/local/${filename}`)));
+        isTemplateLoaded = this.fetchTemplate(`/local/community/${filename}`)
+          .catch(() => this.fetchTemplate(`/local/${filename}`));
+        //X isTemplateLoaded = this.fetchTemplate(`/hacsfiles/${filename}`)
+        //X   .catch(() => this.fetchTemplate(`/local/community/${filename}`)
+        //X   .catch(() => this.fetchTemplate(`/local/${filename}`)));
       }
       if (isTemplateLoaded instanceof Promise) {
         isTemplateLoaded.then(() => {
