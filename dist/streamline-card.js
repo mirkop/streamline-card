@@ -6419,64 +6419,63 @@ function parseDocument(source, options = {}) {
   }
   return doc;
 }
-async function fetchAndParseYaml(url) {
+const fetchAndParseYaml = async function fetchAndParseYaml2(url) {
   const response = await fetch(url);
-  if (!response.ok) throw new Error(`Failed to fetch ${url}`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch ${url}`);
+  }
   const text = await response.text();
   return await evaluateYaml(text, url.substring(0, url.lastIndexOf("/") + 1));
-}
-async function fetchDirNamed(baseUrl) {
-  const manifestUrl = baseUrl + "manifest.json";
-  const response = await fetch(manifestUrl);
-  if (!response.ok) throw new Error(`Failed to fetch manifest: ${manifestUrl}`);
-  const files = await response.json();
-  const result = {};
-  for (const file of files) {
-    const name = file.replace(/\..*$/, "");
-    result[name] = await fetchAndParseYaml(baseUrl + file);
-  }
-  return result;
-}
+};
 const IncludeTag = {
-  tag: "!include",
-  resolve: (doc, cst) => Scalar.resolve(doc, cst),
-  options: {},
   async: true,
-  construct: async function(data, doc, tag) {
+  construct: async function construct(data, doc) {
     const url = doc.options.baseUrl + data;
     return await fetchAndParseYaml(url);
-  }
-};
-const IncludeDirNamedTag = {
-  tag: "!include_dir_named",
-  resolve: (doc, cst) => Scalar.resolve(doc, cst),
+  },
   options: {},
-  async: true,
-  construct: async function(data, doc, tag) {
-    const url = doc.options.baseUrl + data + "/";
-    return await fetchDirNamed(url);
-  }
+  resolve: (doc, cst) => Scalar.resolve(doc, cst),
+  tag: "!include"
 };
 async function evaluateYaml(yamlString, baseUrl = "/hacsfiles/streamline-card/") {
-  const customTags = [IncludeTag, IncludeDirNamedTag];
-  const doc = parseDocument(yamlString, { customTags, baseUrl });
-  async function resolveAsync(node) {
-    if (node && typeof node === "object" && node.tag && (node.tag === "!include" || node.tag === "!include_dir_named")) {
-      return await node.resolve();
+  const customTags = [IncludeTag];
+  const doc = parseDocument(yamlString, { baseUrl, customTags });
+  const resolveAsync = async function resolveAsync2(node, docInstance = doc) {
+    if (node && typeof node === "object" && node.tag && node.tag === "!include") {
+      const tagHandler = customTags.find((tagObj) => tagObj.tag === node.tag);
+      if (tagHandler && typeof tagHandler.construct === "function") {
+        return await tagHandler.construct(node.value, docInstance);
+      }
     }
     if (node instanceof YAMLMap) {
       const out = {};
-      for (const [k, v] of node.items) {
-        out[k] = await resolveAsync(v);
+      const items = await Promise.all(node.items.map(async ([key, value]) => [key, await resolveAsync2(value, docInstance)]));
+      for (const [key, resolvedValue] of items) {
+        out[key] = resolvedValue;
       }
       return out;
     }
+    if (node instanceof YAMLSeq) {
+      return Promise.all(node.items.map((item) => resolveAsync2(item, docInstance)));
+    }
+    if (Scalar.isScalar(node)) {
+      return node.value;
+    }
     if (Array.isArray(node)) {
-      return Promise.all(node.map(resolveAsync));
+      return Promise.all(node.map((item) => resolveAsync2(item, docInstance)));
+    }
+    if (node && typeof node === "object") {
+      const out = {};
+      const keys = Object.keys(node);
+      const values = await Promise.all(keys.map((key) => resolveAsync2(node[key], docInstance)));
+      keys.forEach((key, idx) => {
+        out[key] = values[idx];
+      });
+      return out;
     }
     return node;
-  }
-  return await resolveAsync(doc.contents);
+  };
+  return await resolveAsync(doc.contents, doc);
 }
 const version = "0.1.0";
 let isTemplateLoaded = null;
